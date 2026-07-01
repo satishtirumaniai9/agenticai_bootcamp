@@ -61,7 +61,7 @@ def call_openai_paid(question: str) -> str:
 
 
 def call_fallback(question: str) -> str:
-    from _6_fake_ai_call import FakeAIClient
+    from Python_Basics._6_fake_ai_call import FakeAIClient
 
     client = FakeAIClient()
     response = client.chat.completions.create(

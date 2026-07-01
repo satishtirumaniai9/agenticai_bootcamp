@@ -1,12 +1,12 @@
 """
-_12_agent_with_one_tool.py
+_13_agent_with_more_tools.py
 
-The exact same Agent class from File 11, with one addition: a `tools`
-dict, and the validated currency tool from File 10 dropped into it.
-The agent can now hold both its brain AND a working tool -- it still
-doesn't decide on its own when to use it. That's Class 4.
+File 12's agent, now with THREE tools instead of one: currency
+conversion (real, from File 9/10), plus weather and a calculator
+(both simple, local, no network -- the point here is "more than one
+tool registered," not "every tool must hit the internet").
 
-Run with: uv run _12_agent_with_one_tool.py
+Run with: uv run _13_agent_with_more_tools.py
 """
 
 import functools
@@ -20,8 +20,6 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator, ValidationError
 
 load_dotenv()
-
-# --- The tool, exactly as File 10 built it ---
 
 TOOL_REGISTRY: dict[str, Callable] = {}
 
@@ -38,6 +36,8 @@ def tool(func: Callable) -> Callable:
     TOOL_REGISTRY[func.__name__] = wrapper
     return wrapper
 
+
+# --- Tool 1: currency conversion (unchanged from File 12) ---
 
 KNOWN_CURRENCIES = {"USD", "INR", "EUR", "GBP", "JPY"}
 
@@ -73,6 +73,28 @@ def convert_currency(amount: float, from_currency: str, to_currency: str) -> flo
         return f"No rate available for {from_currency} -> {to_currency}"
 
 
+# --- Tool 2: weather (new -- simple sample data, no network) ---
+
+SAMPLE_WEATHER = {"tokyo": "22°C, partly cloudy", "delhi": "34°C, clear skies", "london": "15°C, light rain"}
+
+
+@tool
+def get_weather(city: str) -> str:
+    return SAMPLE_WEATHER.get(city.lower(), f"No data for {city!r}")
+
+
+# --- Tool 3: calculator (new -- the safe-eval pattern from Class 1) ---
+
+@tool
+def calculator(expression: str) -> float:
+    allowed_characters = set("0123456789+-*/(). ")
+    if not set(expression) <= allowed_characters:
+        raise ValueError(f"Expression contains characters that aren't allowed: {expression!r}")
+    return eval(expression)
+
+
+# --- Validated dispatch across ALL three tools, by name ---
+
 def call_tool_safely(name: str, raw_arguments: dict):
     if name == "convert_currency":
         try:
@@ -80,16 +102,18 @@ def call_tool_safely(name: str, raw_arguments: dict):
         except ValidationError as exc:
             return f"Rejected before the tool ran: {exc}"
         return convert_currency(**validated.model_dump())
+    if name == "get_weather":
+        return get_weather(**raw_arguments)
+    if name == "calculator":
+        return calculator(**raw_arguments)
     return f"No tool named {name!r}"
 
-
-# --- The Agent, now with a `tools` attribute (File 11 + one new field) ---
 
 @dataclass
 class Agent:
     name: str
     system_prompt: str
-    tools: dict = field(default_factory=dict)   # <-- new since File 11
+    tools: dict = field(default_factory=dict)
     messages: list = field(default_factory=list)
 
     def remember(self, role: str, content: str) -> None:
@@ -98,6 +122,9 @@ class Agent:
     def show_transcript(self) -> None:
         for turn in self.messages:
             print(f"{turn['role']:>9}: {turn['content']}")
+
+    def use_tool(self, name: str, **arguments):
+        return call_tool_safely(name, arguments)
 
     def ask_brain(self, question: str) -> str:
         self.remember("user", question)
@@ -117,13 +144,9 @@ class Agent:
         self.remember("assistant", answer)
         return answer
 
-    def use_tool(self, name: str, **arguments):
-        """Manually trigger a tool by name -- WE decide, not the brain. Yet."""
-        return call_tool_safely(name, arguments)
-
     @staticmethod
     def _fallback(question: str) -> str:
-        from _6_fake_ai_call import FakeAIClient
+        from Python_Basics._6_fake_ai_call import FakeAIClient
 
         client = FakeAIClient()
         response = client.chat.completions.create(
@@ -133,19 +156,14 @@ class Agent:
 
 
 if __name__ == "__main__":
-    trip_planner = Agent(
-        name="Trip Planner",
-        system_prompt="You help people plan trips using currency conversion.",
-        tools=TOOL_REGISTRY,
-    )
+    trip_planner = Agent(name="Trip Planner", system_prompt="You help people plan trips.", tools=TOOL_REGISTRY)
 
-    print("--- Talking to the brain ---")
-    print(trip_planner.ask_brain("Should I exchange money before or after I travel?"))
-
-    print("\n--- Manually using its tool ---")
+    print("--- Three tools, used one after another ---")
+    print(trip_planner.use_tool("get_weather", city="Tokyo"))
+    print(trip_planner.use_tool("calculator", expression="22 * 9 / 5 + 32"))
     print(trip_planner.use_tool("convert_currency", amount=100, from_currency="usd", to_currency="inr"))
 
-    print("\n--- Tools this agent has access to ---")
+    print("\n--- All tools registered ---")
     print(list(trip_planner.tools.keys()))
 
-    print("\nThe agent now HAS a working hand. It still waits for us to move it. File 13 adds more hands.")
+    print("\nThree working hands now, not one. File 14 gives this agent a memory worth keeping.")

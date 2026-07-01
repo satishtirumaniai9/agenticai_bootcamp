@@ -108,7 +108,7 @@ def ask_ai(question: str) -> str:
             return response.choices[0].message.content
         except Exception:  # noqa: BLE001
             pass
-    from _6_fake_ai_call import FakeAIClient
+    from Python_Basics._6_fake_ai_call import FakeAIClient
 
     client = FakeAIClient()
     response = client.chat.completions.create(
