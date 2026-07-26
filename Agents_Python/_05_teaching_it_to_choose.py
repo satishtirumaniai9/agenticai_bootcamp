@@ -1,12 +1,3 @@
-"""Letting the model choose a tool for itself, via a tool schema.
-
-Needs an OpenAI-compatible provider (Groq, OpenRouter, or OpenAI) --
-Anthropic's tool-calling API uses a different response shape, covered
-in a later module.
-
-Setup: uv add openai python-dotenv
-.env:  set at least one of GROQ_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY
-"""
 
 import json
 import os
@@ -24,16 +15,12 @@ SAMPLE_WEATHER = {
 
 
 def get_weather(city: str) -> str:
-    """Same tool as File 4 -- a plain function, unaware that an AI exists."""
     data = SAMPLE_WEATHER.get(city.lower())
     if data is None:
         return f"No weather data for {city!r}."
     return f"{city.title()}: {data['celsius']}C, {data['conditions']}"
 
 
-# The "menu" handed to the model. It never sees get_weather() itself --
-# only this description. The wording of "description" is what tells the
-# model when this tool is relevant to a given question.
 get_weather_schema = {
     "type": "function",
     "function": {
@@ -145,14 +132,9 @@ get_tool_schema_for_llm={
 
 
 def get_client_and_model():
-    """Picks whichever OpenAI-compatible provider has a key set. Raises
-    clearly if none is configured, since real decision-making genuinely
-    needs a real model to call.
-    """
     from openai import OpenAI
 
     if os.environ.get("GROQ_API_KEY"):
-        print("Using Groq API...")
         return (
             OpenAI(api_key=os.environ["GROQ_API_KEY"], base_url="https://api.groq.com/openai/v1"),
             "llama-3.3-70b-versatile",
@@ -163,7 +145,6 @@ def get_client_and_model():
             "openrouter/free",
         )
     if os.environ.get("OPENAI_API_KEY"):
-        print("Using OpenAI API...")
         return OpenAI(api_key=os.environ["OPENAI_API_KEY"]), "gpt-4o-mini"
 
     raise RuntimeError(
@@ -173,11 +154,6 @@ def get_client_and_model():
 
 
 def ask_ai_to_choose(question: str):
-    """Sends the question plus the tool schema in one call. The reply may
-    contain a tool_calls list instead of plain text -- that list is the
-    model's decision, not an executed result.
-    """
-
     client, model = get_client_and_model()
     response = client.chat.completions.create(
         model=model,
@@ -185,7 +161,6 @@ def ask_ai_to_choose(question: str):
         messages=[{"role": "user", "content": question}],
         tools=[get_weather_schema,get_capital_schema, get_tool_schema_for_llm],
     )
-
 
     return response.choices[0].message
 
@@ -198,42 +173,10 @@ if __name__ == "__main__":
 
     if message.tool_calls:
         call = message.tool_calls[0]
-        # print('\n\n\n')
-        # print(call)
         arguments = json.loads(call.function.arguments)
-        # print('\n\n\n')
-        # print(arguments, call.function.name)
         result = get_weather(**arguments)
         print(f"{call.function.name}({arguments}) -> {result}")
     else:
         print(message.content)
-
-
-
-'''
-Hi How are you ?
-
-Model's raw reply: ChatCompletionMessage(content="I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?", refusal=None, role='assistant', annotations=[], audio=None, function_call=None, tool_calls=None)
-
-
-what is the weather like in Tokyo right now?
-
-Model's raw reply: ChatCompletionMessage(content=None, refusal=None, role='assistant', annotations=[], audio=None, function_call=None, tool_calls=
-
-
-[ChatCompletionMessageToolCall(id='call_x4l82uTQXd3UR6Nw4Nq8wy48', function=Function(arguments='{"city":"Tokyo"}', name='get_weather'), type='function')]
-
-
-)
-
-What is 2 times 2?
-
-Model's raw reply: ChatCompletionMessage(content=None, refusal=None, role='assistant', annotations=[], audio=None, function_call=None, tool_calls=[ChatCompletionMessageToolCall(id='call_xOvtjwScctaVoFq3YIX8cwvn', function=Function(arguments='{"expression":"2 * 2"}', name='calculator'), type='function')])
-
-What is the capital of Japan?
-
-Model's raw reply: ChatCompletionMessage(content=None, refusal=None, role='assistant', annotations=None, audio=None, function_call=None, tool_calls=[ChatCompletionMessageToolCall(id='nf9wkeb1q', function=Function(arguments='{"country":"Japan"}', name='get_capital'), type='function')])
-
-'''
 
 

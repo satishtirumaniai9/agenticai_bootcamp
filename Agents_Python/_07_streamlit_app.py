@@ -1,12 +1,3 @@
-"""Streamlit front end for the Project Zero agent -- three tools, one chat UI.
-
-Needs an OpenAI-compatible provider (Groq, OpenRouter, or OpenAI).
-
-Setup: uv add streamlit openai requests python-dotenv
-.env:  set at least one of GROQ_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY
-Run:   uv run streamlit run _07_streamlit_app.py
-"""
-
 import json
 import os
 
@@ -17,8 +8,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# --- tools ---
-
 SAMPLE_WEATHER = {
     "tokyo": {"celsius": 22, "conditions": "partly cloudy"},
     "delhi": {"celsius": 34, "conditions": "clear skies"},
@@ -27,7 +16,6 @@ SAMPLE_WEATHER = {
 
 
 def get_weather(city: str) -> str:
-    """Sample data, not a live API -- keeps this tool network-independent."""
     data = SAMPLE_WEATHER.get(city.lower())
     if data is None:
         return f"No weather data for {city!r}."
@@ -35,24 +23,16 @@ def get_weather(city: str) -> str:
 
 
 def calculator(expression: str) -> str:
-    """Evaluates a plain arithmetic expression. Only digits, operators, and
-    parentheses are allowed through before eval() ever runs, so arbitrary
-    code can't be smuggled in via the expression string.
-    """
     allowed_characters = set("0123456789+-*/(). ")
     if not set(expression) <= allowed_characters:
         return f"Rejected -- expression contains disallowed characters: {expression!r}"
     try:
         return str(eval(expression))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"Could not evaluate: {exc}"
 
 
 def convert_currency(amount: float, from_currency: str, to_currency: str) -> str:
-    """Live conversion via the Frankfurter API (free, no key required).
-    A real network call, unlike the other two tools -- worth pointing out
-    that tools can mix live data and static data freely.
-    """
     try:
         response = requests.get(
             "https://api.frankfurter.dev/v1/latest",
@@ -118,12 +98,7 @@ TOOLS_BY_NAME = {
 }
 
 
-# --- brain ---
-
 def get_client_and_model():
-    """Picks whichever OpenAI-compatible provider has a key set. Raises
-    clearly if none is configured.
-    """
     from openai import OpenAI
 
     if os.environ.get("GROQ_API_KEY"):
@@ -146,10 +121,6 @@ def get_client_and_model():
 
 
 def run_agent(messages: list, max_turns: int = 5) -> str:
-    """Same loop as File 6: choose -> execute -> observe -> repeat, until
-    the model returns a final answer with no further tool calls, or
-    max_turns is reached.
-    """
     client, model = get_client_and_model()
 
     for _ in range(max_turns):
@@ -186,14 +157,10 @@ def run_agent(messages: list, max_turns: int = 5) -> str:
     return "Reached max_turns without a final answer."
 
 
-# --- front end ---
-
 st.set_page_config(page_title="Project Zero Agent", page_icon=":robot_face:")
 st.title("Project Zero Agent")
 st.caption("Weather, calculator, and currency conversion -- no framework, just Python.")
 
-# st.session_state.messages is this app's memory -- it survives Streamlit's
-# re-runs on every interaction, which a plain local variable would not.
 if "messages" not in st.session_state:
     st.session_state.messages = []
 

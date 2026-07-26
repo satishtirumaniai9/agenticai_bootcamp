@@ -1,19 +1,7 @@
-"""The assembled agent: brain + tool + schema + a loop that lets the model
-keep calling tools until it is ready to give a final answer.
-
-Needs an OpenAI-compatible provider (Groq, OpenRouter, or OpenAI).
-
-Setup: uv add openai python-dotenv
-.env:  set at least one of GROQ_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY
-"""
-
 import json
 import os
-
 from dotenv import load_dotenv
-
 load_dotenv()
-
 
 SAMPLE_WEATHER = {
     "tokyo": {"celsius": 22, "conditions": "partly cloudy"},
@@ -21,9 +9,7 @@ SAMPLE_WEATHER = {
     "london": {"celsius": 15, "conditions": "light rain"},
 }
 
-
 def get_weather(city: str) -> str:
-    """Get the current weather for a city. Returns a string with the temperature and conditions, or an error message if the city is not found."""
     data = SAMPLE_WEATHER.get(city.lower())
     if data is None:
         return f"No weather data for {city!r}."
@@ -31,8 +17,6 @@ def get_weather(city: str) -> str:
 
 
 def get_currency(from_currency: str, to_currency: str) -> str:
-    """Get the exchange rate between two currencies. Returns a string with the rate, or an error message if the currencies are not found."""
-    # Placeholder implementation - replace with actual currency conversion logic
     return f"The exchange rate from {from_currency} to {to_currency} is 1.0."
 
 
@@ -58,7 +42,6 @@ TOOLS_BY_NAME = {"get_weather": get_weather,'get_currency':get_currency}
 
 
 def get_client_and_model():
-    """Same provider picker as File 5. Raises if no compatible key is set."""
     from openai import OpenAI
 
     if os.environ.get("GROQ_API_KEY"):
@@ -81,24 +64,15 @@ def get_client_and_model():
 
 
 def run_agent(messages: list, max_turns: int = 4) -> str:
-    """The agent loop. Each turn: call the model with the tool schema
-    attached; if it replies with tool_calls, execute every one of them
-    and feed the results back in; if it replies with plain content
-    instead, that is the final answer and the loop stops. max_turns is a
-    safety limit so a confused model can't loop forever.
-    """
     client, model = get_client_and_model()
-
     for _ in range(max_turns):
         response = client.chat.completions.create(
             model=model, max_tokens=300, messages=messages, tools=TOOL_SCHEMAS
         )
         message = response.choices[0].message
-
         if not message.tool_calls:
             messages.append({"role": "assistant", "content": message.content})
             return message.content
-
         messages.append(
             {
                 "role": "assistant",
@@ -124,9 +98,6 @@ def run_agent(messages: list, max_turns: int = 4) -> str:
 
 
 def chat() -> None:
-    """A minimal terminal REPL. conversation_memory is the agent's entire
-    memory -- a plain list, grown by run_agent() on every turn.
-    """
     conversation_memory: list[dict] = []
     print("Type a question (Ctrl+C to quit).")
 

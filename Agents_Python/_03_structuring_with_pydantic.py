@@ -1,9 +1,3 @@
-"""Structuring an AI reply with Pydantic so it can be trusted downstream.
-
-Setup: uv add pydantic openai anthropic python-dotenv
-.env:  set at least one of OPENAI_API_KEY / ANTHROPIC_API_KEY / GROQ_API_KEY / OPENROUTER_API_KEY
-"""
-
 import json
 import os
 
@@ -13,9 +7,6 @@ from pydantic import BaseModel, ValidationError
 load_dotenv()
 
 
-# --- brain: same four-provider picker as File 2, duplicated here so this
-# file can run entirely on its own, with no import from another file. ---
-
 def ask_openai(question: str) -> str:
     from openai import OpenAI
 
@@ -23,9 +14,6 @@ def ask_openai(question: str) -> str:
     response = client.chat.completions.create(
         model="gpt-4o-mini", max_tokens=200, messages=[{"role": "user", "content": question}]
     )
-    print(question)
-    print('openAI',response.choices[0].message.content)
-
     return response.choices[0].message.content
 
 
@@ -74,23 +62,12 @@ def ask_ai(question: str) -> str:
     )
 
 
-# --- structured extraction ---
-
 class WeatherQuestion(BaseModel):
-    """The only shape we're willing to trust back from the model: a plain
-    city name plus whether the person wants Fahrenheit instead of Celsius.
-    """
-
     city: str 
     wants_fahrenheit: bool = False 
 
 
 def extract_weather_question(user_message: str) -> WeatherQuestion | str:
-    """Asks the model to respond with ONLY a JSON object matching
-    WeatherQuestion, then parses and validates it. Returns the validated
-    model on success, or a short error string if the reply didn't match
-    the expected shape -- so a bad response never silently continues.
-    """
     instruction = (
         "Read the user's message and reply with ONLY a JSON object -- no other "
         'text -- in this exact shape: {"city": "<city name>", '
@@ -98,8 +75,6 @@ def extract_weather_question(user_message: str) -> WeatherQuestion | str:
         f"User's message: {user_message!r}"
     )
     raw_reply = ask_ai(instruction)
-
-    print(f" \n \n \n Raw reply from model: {raw_reply!r}")
     try:
         cleaned = raw_reply.strip().removeprefix("```json").removesuffix("```").strip()
         data = json.loads(cleaned)

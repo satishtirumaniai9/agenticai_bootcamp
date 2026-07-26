@@ -1,9 +1,3 @@
-"""A tool (weather) called manually, using a structured field extracted by the AI.
-
-Setup: uv add pydantic openai anthropic python-dotenv
-.env:  set at least one of OPENAI_API_KEY / ANTHROPIC_API_KEY / GROQ_API_KEY / OPENROUTER_API_KEY
-"""
-
 import json
 import os
 
@@ -12,8 +6,6 @@ from pydantic import BaseModel, ValidationError
 
 load_dotenv()
 
-
-# --- brain ---
 
 def ask_openai(question: str) -> str:
     from openai import OpenAI
@@ -42,8 +34,6 @@ def ask_groq(question: str) -> str:
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile", max_tokens=200, messages=[{"role": "user", "content": question}]
     )
-    print("Instructions to model: ", question)
-    print("Answering question using Groq API...", response.choices[0].message.content)
     return response.choices[0].message.content
 
 
@@ -72,8 +62,6 @@ def ask_ai(question: str) -> str:
     )
 
 
-# --- structured extraction (same as File 3) ---
-
 class WeatherQuestion(BaseModel):
     city: str
     wants_fahrenheit: bool = False
@@ -87,9 +75,6 @@ def extract_weather_question(user_message: str) -> WeatherQuestion | str:
         f"User's message: {user_message!r}"
     )
     raw_reply = ask_ai(instruction)
-
-    print(f"Raw reply from model: {raw_reply!r}")
-
     try:
         cleaned = raw_reply.strip().removeprefix("```json").removesuffix("```").strip()
         data = json.loads(cleaned)
@@ -97,8 +82,6 @@ def extract_weather_question(user_message: str) -> WeatherQuestion | str:
     except (json.JSONDecodeError, ValidationError) as exc:
         return f"Rejected: {exc}"
 
-
-# --- the tool ---
 
 SAMPLE_WEATHER = {
     "tokyo": {"celsius": 22, "conditions": "partly cloudy"},
@@ -108,10 +91,6 @@ SAMPLE_WEATHER = {
 
 
 def get_weather(city: str) -> str:
-    """The tool itself -- a plain function with no knowledge of AI at all.
-    Uses sample data rather than a live API so the demo never depends on
-    classroom internet.
-    """
     data = SAMPLE_WEATHER.get(city.lower())
     if data is None:
         return f"No weather data for {city!r}."
@@ -119,13 +98,7 @@ def get_weather(city: str) -> str:
 
 
 def answer_weather_question(user_message: str) -> str:
-    """The full manual pipeline: extract a trusted city with Pydantic, then
-    WE decide to call get_weather and WE pass the extracted field in.
-    Nothing here is decided by the model beyond the extraction step.
-    """
     extracted = extract_weather_question(user_message)
-    print(f"Extracted: {extracted!r}")
-    # extracted is of Type WeatherQuestion
     if not isinstance(extracted, WeatherQuestion):
         return f"Could not extract a city: {extracted}"
     return get_weather(extracted.city)
